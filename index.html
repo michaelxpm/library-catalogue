@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library Finder</title>
+  <style>
+    :root { font-family: system-ui, Arial, sans-serif; color: #172338; background: #f5f7fb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #20365a; color: white; padding: 30px 20px; }
+    header .wrap, main { max-width: 1000px; margin: auto; }
+    h1 { margin: 0 0 8px; font-size: 2rem; }
+    header p { margin: 0; color: #dbe6f7; }
+    main { padding: 24px 20px 60px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px; }
+    input[type="search"] { flex: 1 1 280px; padding: 13px 14px; border: 1px solid #cbd5e1; border-radius: 9px; font: inherit; }
+    label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+    .summary { color: #516078; margin: 0 0 18px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 15px; }
+    article { background: white; border: 1px solid #e1e7f0; border-radius: 12px; padding: 18px; box-shadow: 0 3px 12px #1e293b0b; }
+    .category { color: #53668a; font-size: .8rem; font-weight: 650; text-transform: uppercase; letter-spacing: .05em; }
+    h2 { font-size: 1.13rem; margin: 10px 0 5px; }
+    .author { color: #536078; margin: 0 0 18px; }
+    .card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .status { font-size: .82rem; font-weight: 650; padding: 5px 9px; border-radius: 20px; }
+    .available { background: #dcfce7; color: #166534; }
+    .unavailable { background: #fee2e2; color: #991b1b; }
+    button { border: 1px solid #b6c4d9; background: white; border-radius: 8px; padding: 8px 10px; cursor: pointer; font: inherit; }
+    button:hover { background: #edf3fc; }
+    button[aria-pressed="true"] { background: #fff1cc; border-color: #e5b64d; }
+    .empty { background: white; border-radius: 10px; padding: 30px; text-align: center; color: #516078; }
+    .hidden { display: none; }
+    footer { text-align: center; color: #65738a; padding: 20px; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <header><div class="wrap"><h1>📚 Library Finder</h1><p>Find books and save your favorites. Demo catalogue with fictional data.</p></div></header>
+  <main>
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search by title or author..." aria-label="Search by title or author">
+      <label><input id="availableOnly" type="checkbox"> Available only</label>
+      <label><input id="favoritesOnly" type="checkbox"> Favorites only</label>
+    </div>
+    <p id="summary" class="summary" aria-live="polite"></p>
+    <div id="books" class="grid"></div>
+    <p id="empty" class="empty hidden">No books found. Try another search or change your filters.</p>
+  </main>
+  <footer>Sample catalogue · Favorites are stored only in this browser</footer>
+  <script>
+    const books = [
+      {id: 1, title: 'Introduction to Python', author: 'J. Smith', category: 'Programming', available: true},
+      {id: 2, title: 'JavaScript Essentials', author: 'A. Lee', category: 'Programming', available: true},
+      {id: 3, title: 'Database Fundamentals', author: 'M. Tan', category: 'Computing', available: false},
+      {id: 4, title: 'Modern Web Design', author: 'S. Kumar', category: 'Design', available: true},
+      {id: 5, title: 'Algorithms Made Simple', author: 'R. Chen', category: 'Computing', available: false},
+      {id: 6, title: 'Artificial Intelligence Basics', author: 'P. Wong', category: 'AI', available: true},
+      {id: 7, title: 'Data Science with Python', author: 'L. Lim', category: 'Data Science', available: true},
+      {id: 8, title: 'Software Engineering Practice', author: 'N. Patel', category: 'Engineering', available: true},
+      {id: 9, title: 'Machine Learning Foundations', author: 'T. Ng', category: 'AI', available: false},
+      {id: 10, title: 'Computer Networks', author: 'E. Davis', category: 'Computing', available: true},
+      {id: 11, title: 'Human-Centered Design', author: 'F. Ahmad', category: 'Design', available: true},
+      {id: 12, title: 'Introduction to Economics', author: 'C. Zhao', category: 'Economics', available: false}
+    ];
+
+    const searchInput = document.getElementById('search');
+    const availableOnly = document.getElementById('availableOnly');
+    const favoritesOnly = document.getElementById('favoritesOnly');
+    const booksContainer = document.getElementById('books');
+    const summary = document.getElementById('summary');
+    const emptyMessage = document.getElementById('empty');
+    const storageKey = 'library-finder-favorites-v1';
+
+    function loadFavorites() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        return new Set(Array.isArray(saved) ? saved.filter(id => Number.isInteger(id)) : []);
+      } catch (error) {
+        console.warn('Could not read saved favorites:', error);
+        return new Set();
+      }
+    }
+    const favorites = loadFavorites();
+
+    function saveFavorites() {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify([...favorites]));
+      } catch (error) {
+        console.warn('Could not save favorites:', error);
+        alert('Favorites could not be saved in this browser.');
+      }
+    }
+
+    function toggleFavorite(id) {
+      if (favorites.has(id)) favorites.delete(id);
+      else favorites.add(id);
+      saveFavorites();
+      renderBooks();
+    }
+
+    function renderBooks() {
+      const query = searchInput.value.trim().toLowerCase();
+      const matches = books.filter(book => {
+        const textMatches = book.title.toLowerCase().includes(query) || book.author.toLowerCase().includes(query);
+        return textMatches && (!availableOnly.checked || book.available) && (!favoritesOnly.checked || favorites.has(book.id));
+      });
+      booksContainer.replaceChildren();
+      matches.forEach(book => {
+        const card = document.createElement('article');
+        const category = document.createElement('div');
+        category.className = 'category';
+        category.textContent = book.category;
+        const title = document.createElement('h2');
+        title.textContent = book.title;
+        const author = document.createElement('p');
+        author.className = 'author';
+        author.textContent = 'By ' + book.author;
+        const footer = document.createElement('div');
+        footer.className = 'card-footer';
+        const status = document.createElement('span');
+        status.className = 'status ' + (book.available ? 'available' : 'unavailable');
+        status.textContent = book.available ? 'Available' : 'Unavailable';
+        const button = document.createElement('button');
+        const isFavorite = favorites.has(book.id);
+        button.type = 'button';
+        button.textContent = isFavorite ? '★ Saved' : '☆ Favorite';
+        button.setAttribute('aria-pressed', String(isFavorite));
+        button.setAttribute('aria-label', (isFavorite ? 'Remove ' : 'Add ') + book.title + (isFavorite ? ' from favorites' : ' to favorites'));
+        button.addEventListener('click', () => toggleFavorite(book.id));
+        footer.append(status, button);
+        card.append(category, title, author, footer);
+        booksContainer.append(card);
+      });
+      summary.textContent = `${matches.length} of ${books.length} books shown · ${favorites.size} favorites saved`;
+      emptyMessage.classList.toggle('hidden', matches.length !== 0);
+    }
+
+    searchInput.addEventListener('input', renderBooks);
+    availableOnly.addEventListener('change', renderBooks);
+    favoritesOnly.addEventListener('change', renderBooks);
+    renderBooks();
+  </script>
+</body>
+</html>
